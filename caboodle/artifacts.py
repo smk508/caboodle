@@ -1,6 +1,6 @@
 from google.cloud import storage
 from typing import List, Tuple, Union
-from butterfree.cloud import gcs
+from caboodle import gcs
 import pickle
 import abc
 import io
@@ -144,7 +144,7 @@ suffixes = { # File suffixes are used to automatically read in artifacts from fi
 }
 
 if fireworks_installed:
-    suffixes['fireworks']: FireworksArtifact,
+    suffixes['fireworks']: FireworksArtifact
 
 def infer_type(name):
     """
@@ -212,6 +212,19 @@ class Coffer(metaclass=abc.ABCMeta):
             artifact.serialize(path)
         
         return serial_path    
+
+class DebugCoffer(Coffer):
+    """
+    This coffer saves artifacts in memory and is useful for testing.
+    """
+    def __init__(self):
+        self.artifacts = []
+
+    def upload(self, artifacts: List[Type[Artifact]]):
+        self.artifacts.extend(artifacts)
+
+    def download(self) -> List[Type[Artifact]]:
+        return self.artifacts
 
 class GCSCoffer(Coffer):
     """

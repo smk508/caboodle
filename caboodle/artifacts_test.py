@@ -76,7 +76,7 @@ def test_BinaryArtifact():
     b3 = art.deserialize(buffer)
     assert b3 == b
 
-def test_GCSCoffer():
+def test_Coffer():
 
     m = Message({'a': [1,2,3], 'b': torch.tensor([4,5,6])})
     art1 = artifacts.FireworksArtifact('test.fireworks', m)
@@ -85,7 +85,8 @@ def test_GCSCoffer():
     b = b'hohohooh'
     art3 = artifacts.BinaryArtifact('test.bin', b)
 
-    coffee = artifacts.GCSCoffer('test-bucket', '/artifacts/')
+    #coffee = artifacts.GCSCoffer('test-bucket', '/artifacts/')
+    coffee = artifacts.DebugCoffer()
     art_gallery = [art1, art2, art3]
     coffee.upload(art_gallery)
     fart_gallery = coffee.download()
