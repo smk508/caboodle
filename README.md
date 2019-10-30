@@ -5,3 +5,6 @@
 [![codecov](https://codecov.io/gh/smk508/caboodle/branch/master/graph/badge.svg)](https://codecov.io/gh/smk508/caboodle)
 
 A python library for artifact management for data science applications in the cloud.
+
+![Diagram](figures/caboodle.png)
+Format: ![Alt Text](diagram)
