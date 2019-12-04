@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "the-whole-caboodle"
+version = "0.1.1"
+description = "Utilities for artifact management for data science in the cloud."
+authors = ["Saad Khan <skhan8@mail.einstein.yu.edu>"]
+packages = [
+    { include = "caboodle" }
+]
+exclude = ["*_test.py"]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+google-cloud-storage = "^1.23"
+kfp = "^0.1.36"
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.0"
+
+[tool.poetry.extras]
+fireworks-ml = "^0.3.7"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
