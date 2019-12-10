@@ -1,6 +1,6 @@
 from google.cloud import storage
 from typing import List, Tuple, Union
-from caboodle import gcs
+from caboodle import gcs, artifacts
 from caboodle.artifacts import Artifact
 import pickle
 import abc
@@ -15,6 +15,34 @@ try:
 except Exception as e:
     print("{0}\n\n Try setting the environment variable GOOGLE_APPLICATION_CREDENTIALS to point to the file containing your service account key.".format(e))
     raise e
+
+try:
+    import fireworks
+    fireworks_installed = True
+except ModuleNotFoundError:
+    fireworks_installed = False
+
+suffixes = { # File suffixes are used to automatically read in artifacts from file into the correct format.
+    'bin': artifacts.BinaryArtifact,
+    'pickle': artifacts.PickleArtifact
+}
+
+if fireworks_installed:
+    suffixes['fireworks'] = artifacts.FireworksArtifact
+
+def infer_type(name):
+    """
+    Returns the artifact type to use for a given filename.
+    """
+    suffix = name.split('.')[-1]
+    try:
+        return suffixes[suffix]
+    except KeyError:
+        raise KeyError
+        ("Could not infer or parse file type for {1}. Must be one of: {0}".format(
+            ", ".join(".{0}".format(s, name) for s in suffixes.keys())
+            )
+        )
 
 class Coffer(metaclass=abc.ABCMeta):
     """
@@ -86,8 +114,9 @@ class GCSCoffer(Coffer):
     """
     Represents multiple artifacts stored in a folder in a GCS bucket.
     """
-    def __init__(self, bucket_name, path):
-        
+    def __init__(self, gcs_path):
+
+        bucket_name, path = gcs.parse_gcs_path(gcs_path)
         self.bucket_name = bucket_name
         self.path = path
     
@@ -113,3 +142,24 @@ class GCSCoffer(Coffer):
                 pass
         
         return artifacts
+
+    def get(self, artifact_name) -> Type[Artifact]:
+        """
+        Returns an artifact by name.
+        """
+        bucket = storage_client.get_bucket(self.bucket_name)
+        blob = bucket.get_blob(os.path.join(self.path, artifact_name))
+        if blob is None:
+            raise ValueError(
+                "Could not find artifact {0} at location gs://{1}/{2}".format(
+                    artifact_name,
+                    self.bucket_name,
+                    self.path,
+                )
+            )
+        artifact_type = infer_type(blob.name)
+        buffer = io.BytesIO(blob.download_as_string())
+        key = blob.name.split('/')[-1]
+        artifact = artifact_type(key, buffer, deserialize=True)        
+
+        return artifact

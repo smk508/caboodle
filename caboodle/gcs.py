@@ -86,3 +86,24 @@ def download_file_to_path(bucket_name, file_name, path):
     blob = bucket.blob(file_name)
     with open(path, 'wb') as f:
         storage_client.download_blob_to_file(blob, f)
+    
+def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
+    """ Parses a gcs path string of the form gs://{bucket-name}/{path} into bucket and path components. """
+
+    if not gcs_path.startswith('gs://'):
+        raise ValueError("Argument must be a gcs path string of the form gs://{bucket-name}/{path}")
+    
+    components = gcs_path.split('/')
+    bucket_name = components[2]
+    path = os.path.join(*components[3:])
+    
+    return bucket_name, path
+
+def check_for_files(gcs_path, artifact_names):
+    """ Checks to see if the specified file names are present in the gcs directory. """
+
+    bucket_name, path = parse_gcs_path(gcs_path)
+    bucket = storage_client.get_bucket(bucket_name)
+    names = set(b.name.split('/')[-1] for b in bucket.list_blobs(prefix=path))
+    artifact_names = set(artifact_names)
+    return artifact_names.issubset(names)

@@ -129,25 +129,3 @@ class AvroArtifact(Artifact):
     """
     artifact_type = object
     pass
-
-suffixes = { # File suffixes are used to automatically read in artifacts from file into the correct format.
-    'bin': BinaryArtifact,
-    'pickle': PickleArtifact
-}
-
-if fireworks_installed:
-    suffixes['fireworks']: FireworksArtifact
-
-def infer_type(name):
-    """
-    Returns the artifact type to use for a given filename.
-    """
-    suffix = name.split('.')[-1]
-    try:
-        return suffixes[suffix]
-    except KeyError:
-        raise KeyError
-        ("Could not infer or parse file type. Must be one of: {0}".format(
-            ", ".join(".{0}".format(s) for s in suffixes.keys())
-            )
-        )
