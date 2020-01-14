@@ -70,15 +70,18 @@ def upload_string(string, bucket_name, path, verbose=True, replace=True):
     blob = bucket.blob(path)
     blob.upload_from_string(string)
 
-def download_file_to_memory(bucket_name, file_name):
-    """ Downloads a file hosted in a bucket into a StringIO buffer. """
+def download_file_to_memory(bucket_name, file_name, buffer_type=None):
+    """ Downloads a file hosted in a bucket into a buffer. """
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(file_name)
     buffer = io.BytesIO()
     storage_client.download_blob_to_file(blob, buffer)
-    string_buffer = io.StringIO(buffer.getvalue().decode('utf-8'))
-
-    return string_buffer
+    buffer.seek(0)
+    if buffer_type == 'string':
+        string_buffer = io.StringIO(buffer.getvalue().decode('utf-8'))
+        return string_buffer
+    else:
+        return buffer
 
 def download_file_to_path(bucket_name, file_name, path):
     """ Downloads a file hosted in a bucket to the chosen path. """

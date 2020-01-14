@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "the-whole-caboodle"
-version = "0.1.4"
+version = "0.1.6"
 description = "Utilities for artifact management for data science in the cloud."
 authors = ["Saad Khan <skhan8@mail.einstein.yu.edu>"]
 packages = [
@@ -17,7 +17,7 @@ kfp = "^0.1.36"
 pytest = "^3.0"
 
 [tool.poetry.extras]
-fireworks-ml = "^0.3.7"
+fireworks-ml = ["^0.3.7"]
 
 [build-system]
 requires = ["poetry>=0.12"]
