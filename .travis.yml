@@ -6,6 +6,7 @@ python:
     - "3.8"
 before_install:
     - pip install poetry
+    - pip install pytest-cov
 install:
     - poetry build
     - poetry install    
