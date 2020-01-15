@@ -9,7 +9,8 @@ before_install:
     - pip install pytest-cov
 install:
     - poetry build
-    - poetry install    
+    - poetry install
+    - pip install fireworks-ml
 script:
     - pytest --cov=./
     # Add scripts for linting
