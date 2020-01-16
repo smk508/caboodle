@@ -2,6 +2,7 @@
 from google.cloud import storage
 from typing import List, Tuple, Union
 import io
+
 # Instantiates a client
 try:
     storage_client = storage.Client()
@@ -89,7 +90,21 @@ def download_file_to_path(bucket_name, file_name, path):
     blob = bucket.blob(file_name)
     with open(path, 'wb') as f:
         storage_client.download_blob_to_file(blob, f)
-    
+
+def download_folder_to_path(bucket_name, folder, path, suffix=None):
+    """ Downloads a folder hosted in a bucket to the chosen path. """
+    bucket = storage_client.get_bucket(bucket_name)
+    blobs = list(bucket.list_blobs(prefix=folder))
+    if suffix:
+        blobs = [b for b in blobs if b.name.endswith(suffix)]
+    for blob in tqdm(blobs):
+        filename = blob.name.split('/')[-1]
+        if not os.path.isdir(path):
+            raise ValueError("You must first create a folder at {0} before running this command.".format(path))
+        with open(os.path.join(path, filename), 'wb') as f:
+            print("Downloading {0}".format(blob.name))
+            storage_client.download_blob_to_file(blob, f)
+
 def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
     """ Parses a gcs path string of the form gs://{bucket-name}/{path} into bucket and path components. """
 
