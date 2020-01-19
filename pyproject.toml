@@ -9,7 +9,7 @@ packages = [
 exclude = ["*_test.py"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.3"
 google-cloud-storage = "^1.23"
 
 [tool.poetry.dev-dependencies]
