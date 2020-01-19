@@ -9,13 +9,6 @@ import random
 import os
 from typing import Union, Type, Dict
 
-# Instantiates a client
-try:
-    storage_client = storage.Client()
-except Exception as e:
-    print("{0}\n\n Try setting the environment variable GOOGLE_APPLICATION_CREDENTIALS to point to the file containing your service account key.".format(e))
-    raise e
-
 try:
     import fireworks
     fireworks_installed = True
@@ -114,21 +107,22 @@ class GCSCoffer(Coffer):
     """
     Represents multiple artifacts stored in a folder in a GCS bucket.
     """
-    def __init__(self, gcs_path):
+    def __init__(self, gcs_path, storage_client=None):
 
         bucket_name, path = gcs.parse_gcs_path(gcs_path)
         self.bucket_name = bucket_name
         self.path = path
+        self.storage_client = storage_client or gcs.get_storage_client()
     
     def upload(self, artifacts: List[Type[Artifact]]):
         buffer_dict = self.serialize_artifacts(artifacts)
-        bucket = storage_client.get_bucket(self.bucket_name)
+        bucket = self.storage_client.get_bucket(self.bucket_name)
         for key, buffer in buffer_dict.items():
             blob = bucket.blob(os.path.join(self.path, key))
             blob.upload_from_string(buffer.read())
 
     def download(self) -> List[Type[Artifact]]:
-        bucket = storage_client.get_bucket(self.bucket_name)
+        bucket = self.storage_client.get_bucket(self.bucket_name)
         blobs = bucket.list_blobs(prefix=self.path)
         artifacts = []
         for blob in blobs:
@@ -147,7 +141,7 @@ class GCSCoffer(Coffer):
         """
         Returns an artifact by name.
         """
-        bucket = storage_client.get_bucket(self.bucket_name)
+        bucket = self.storage_client.get_bucket(self.bucket_name)
         blob = bucket.get_blob(os.path.join(self.path, artifact_name))
         if blob is None:
             raise ValueError(

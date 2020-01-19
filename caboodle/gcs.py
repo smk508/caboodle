@@ -2,21 +2,40 @@
 from google.cloud import storage
 from typing import List, Tuple, Union
 import io
-
-# Instantiates a client
-try:
-    storage_client = storage.Client()
-except Exception as e:
-    print("{0}\n\n Try setting the environment variable GOOGLE_APPLICATION_CREDENTIALS to point to the file containing your service account key.".format(e))
-    raise e
-
+import warnings
 import os
 
 def printv(*args, verbose=True, **kwargs):
     if verbose:
         print(*args, **kwargs)
 
-def upload_all(path, bucket_name, folder_name, verbose=True, replace=True, use_filepaths=True):
+def get_storage_client():
+    """
+    Instantiates a storage client by reading the environment variable
+    GOOGLE_APPLICATION_CREDENTIALS.
+    """
+    # Instantiates a client
+    try:
+        storage_client = storage.Client()
+    except Exception as e:
+        print("Could not instantiate a storage client. \
+            Try setting the environment variable GOOGLE_APPLICATION_CREDENTIALS to point to \
+            the file containing your service account key."
+            )
+        raise e
+    
+    return storage_client
+
+
+def upload_all(
+    path: str, 
+    bucket_name: str, 
+    folder_name: str, 
+    verbose: bool = True, 
+    replace: bool = True, 
+    use_filepaths: bool = True,
+    storage_client = None
+    ):
     """ 
     This uploads all files under the given path. If path is a directory, this function will
     traverse it; if path points to a file, only that file will be uploaded.
@@ -29,7 +48,7 @@ def upload_all(path, bucket_name, folder_name, verbose=True, replace=True, use_f
         verbose (default True): Whether or not to print info about upload.
         replace (default True): If False, then all files that already exist in the bucket will not be uploaded.
     """
-
+    storage_client = storage_client or get_storage_client()
     # Get bucket and blob from client
     bucket = storage_client.get_bucket(bucket_name)
     depth = len(path.split('/'))
@@ -63,16 +82,30 @@ def upload_all(path, bucket_name, folder_name, verbose=True, replace=True, use_f
 
     printv("Uploaded all files in {0} for bucket {1} under folder {2}".format(path, bucket_name, folder_name))
 
-def upload_string(string, bucket_name, path, verbose=True, replace=True):
+def upload_string(
+    string: str, 
+    bucket_name: str,
+    path: str, 
+    verbose: bool=True, 
+    replace: bool=True,
+    storage_client = None,
+    ):
     """
     Uploads the contents of string to a GCS bucket at the given path.
     """
+    storage_client = storage_client or get_storage_client()
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(path)
     blob.upload_from_string(string)
 
-def download_file_to_memory(bucket_name, file_name, buffer_type=None):
+def download_file_to_memory(
+    bucket_name: str, 
+    file_name: str, 
+    buffer_type: str=None,
+    storage_client = None,
+    ):
     """ Downloads a file hosted in a bucket into a buffer. """
+    storage_client = storage_client or get_storage_client()
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(file_name)
     buffer = io.BytesIO()
@@ -84,15 +117,26 @@ def download_file_to_memory(bucket_name, file_name, buffer_type=None):
     else:
         return buffer
 
-def download_file_to_path(bucket_name, file_name, path):
+def download_file_to_path(
+    bucket_name: str, 
+    file_name: str, 
+    path: str):
+    storage_client = storage_client or get_storage_client()
     """ Downloads a file hosted in a bucket to the chosen path. """
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(file_name)
     with open(path, 'wb') as f:
         storage_client.download_blob_to_file(blob, f)
 
-def download_folder_to_path(bucket_name, folder, path, suffix=None):
+def download_folder_to_path(
+    bucket_name: str, 
+    folder: str, 
+    path: str, 
+    suffix: str=None,
+    storage_client = None):
     """ Downloads a folder hosted in a bucket to the chosen path. """
+    
+    storage_client = storage_client or get_storage_client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = list(bucket.list_blobs(prefix=folder))
     if suffix:
@@ -117,9 +161,12 @@ def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
     
     return bucket_name, path
 
-def check_for_files(gcs_path, artifact_names):
+def check_for_files(
+    gcs_path: str, 
+    artifact_names: list,
+    storage_client = None):
     """ Checks to see if the specified file names are present in the gcs directory. """
-
+    storage_client = storage_client or get_storage_client()
     bucket_name, path = parse_gcs_path(gcs_path)
     bucket = storage_client.get_bucket(bucket_name)
     names = set(b.name.split('/')[-1] for b in bucket.list_blobs(prefix=path))
