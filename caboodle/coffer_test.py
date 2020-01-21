@@ -32,6 +32,6 @@ def test_Coffer():
             fart_gallery_dict['pickle'] = artifact.content
         if artifact.key.endswith('binary'):
             fart_gallery_dict['binary'] = artifact.content                        
-    
+
     for art, fart in zip(art_gallery_dict.values(), fart_gallery_dict.values()):
         assert art == fart
