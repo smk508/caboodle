@@ -4,6 +4,7 @@ from typing import List, Tuple, Union
 import io
 import warnings
 import os
+from tqdm import tqdm
 
 def printv(*args, verbose=True, **kwargs):
     if verbose:
