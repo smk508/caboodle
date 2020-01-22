@@ -173,3 +173,13 @@ def check_for_files(
     names = set(b.name.split('/')[-1] for b in bucket.list_blobs(prefix=path))
     artifact_names = set(artifact_names)
     return artifact_names.issubset(names)
+
+def list_blobs(
+    gcs_path, 
+    storage_client = None):
+    """ Returns a list of names of blobs in the given GCS path. """
+    storage_client = storage_client or get_storage_client()
+    bucket_name, gcs_folder = parse_gcs_path(gcs_path)
+    bucket = storage_client.get_bucket(bucket_name)
+    blobs = bucket.list_blobs(prefix=gcs_folder)
+    return [b.name for b in blobs]
