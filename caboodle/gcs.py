@@ -29,7 +29,7 @@ def get_storage_client():
 
 
 def upload_all(
-    path: str, 
+    path: str,
     bucket_name: str, 
     folder_name: str, 
     verbose: bool = True, 
@@ -152,6 +152,9 @@ def download_folder_to_path(
 
 def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
     """ Parses a gcs path string of the form gs://{bucket-name}/{path} into bucket and path components. """
+
+    # Clean up input
+    gcs_path = gcs_path.replace('"', '').replace("'", '')
 
     if not gcs_path.startswith('gs://'):
         raise ValueError("Argument must be a gcs path string of the form gs://{bucket-name}/{path}")
