@@ -68,7 +68,7 @@ class Artifact(metaclass=abc.ABCMeta):
         pass
     
     @abc.abstractmethod
-    def deserialize(self, path:PathOrBuffer): # TODO: Make this a class method.
+    def deserialize(self, path:PathOrBuffer):
         """
         Loads the artifact from a given file path.
         """
