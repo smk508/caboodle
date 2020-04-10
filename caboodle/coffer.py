@@ -115,6 +115,34 @@ class DebugCoffer(Coffer):
     def download(self) -> List[Type[Artifact]]:
         return self.artifacts
 
+class LocalCoffeR(Coffer):
+    """
+    Stores Artifacts on disk under a given folder.
+    """
+    def __init__(self, path):
+        self.folder = path # TODO: Create folder if not exists and check permissions
+
+    @property
+    def location(self) -> str:
+        return self.folder
+    
+    def upload(self, artifacts: List[Type[Artifact]]):
+
+        for artifact in artifacts:
+            artifact.serialize(os.path.join(self.folder, artifact.key))
+        
+    def download(self) -> List[Type[Artifact]]:
+
+        self.artifacts = []
+        for filename in os.listdir(self.folder):
+            try:
+                artifact_type = infer_type(filename)
+                key = filename
+                artifact = artifact_type(key, os.path.join(self.folder, key), deserialize=True)
+                self.artifacts.append(artifact)
+
+        return self.artifacts
+
 class GCSCoffer(Coffer):
     """
     Represents multiple artifacts stored in a folder in a GCS bucket.
@@ -173,3 +201,10 @@ class GCSCoffer(Coffer):
         artifact = artifact_type(key, buffer, deserialize=True)        
 
         return artifact
+
+def transfer_artifacts(sender: Coffer, receiver: Coffer):
+    """
+    Copies all artifacts from sender Coffer to receiver. Useful if you want to
+    transfer files from one location to another.
+    """
+    pass
