@@ -27,11 +27,38 @@ class DummyFile():
     def clear(self):
         try:
             files = os.listdir(self.base_folder)
-            for file in files:
-                os.remove(os.path.join(self.base_folder, file))
+            for filename in files:
+                os.remove(os.path.join(self.base_folder, filename))
             os.rmdir(self.base_folder)
         except FileNotFoundError:
-            pass    
+            pass
+
+def test_open_close():
+
+    p = [1,2,3,4,'hii']
+    path = os.path.join(base_path, 'test')
+    with DummyFile(path):
+        art = artifacts.PickleArtifact('test', p, path_or_buffer=os.path.join(path, 'open.pickle'))
+        art.save()
+        art2 = artifacts.PickleArtifact('test', path_or_buffer=os.path.join(path, 'open.pickle'))
+        assert art2._content == None
+        with art2 as x:
+            assert art2._content == p
+            assert p == x
+        assert art2._content == None
+        art3 = artifacts.PickleArtifact('test', path_or_buffer=os.path.join(path, 'open.pickle'))
+        assert art2._content == None
+        art3.load()
+        assert art3._content == p
+        art3.close()
+        assert art3._content == None
+        art4 = artifacts.PickleArtifact('test', path_or_buffer=os.path.join(path, 'open.pickle'))
+        assert art4._content == None
+        assert art4.data == p
+        assert art4._content == p
+        art4.close()
+        assert art4._content == None
+
 def test_FireworksArtifact():
     
     m = Message({'a': [1,2,3], 'b': torch.tensor([4,5,6])})
@@ -55,7 +82,7 @@ def test_PickleArtifact():
     with DummyFile(path):
         file_path = os.path.join(path,'test.pickle')
         art.serialize(file_path)
-        p2 = art.deserialize(file_path)    
+        p2 = art.deserialize(file_path)
         assert p2 == p
     buffer = io.BytesIO()
     art.serialize(buffer)
