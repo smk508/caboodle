@@ -56,6 +56,14 @@ class Coffer(metaclass=abc.ABCMeta):
         """
         pass
     
+    @abc.abstractproperty
+    def location(self) -> str:
+        """
+        A string which describe the location that the coffer stores data. For
+        example, this could refer to a bucket URI
+        """
+        pass
+
     def serialize_artifacts(self, artifacts: List[Artifact]) -> Dict[str, bytes]:
         """
         Serializes a list of artifacts and returns a dictionary mapping their keys to their
@@ -97,6 +105,10 @@ class DebugCoffer(Coffer):
     def __init__(self):
         self.artifacts = []
 
+    @property
+    def location(self) -> str:
+        return "In Memory"
+
     def upload(self, artifacts: List[Type[Artifact]]):
         self.artifacts.extend(artifacts)
 
@@ -113,6 +125,10 @@ class GCSCoffer(Coffer):
         self.bucket_name = bucket_name
         self.path = path
         self.storage_client = storage_client or gcs.get_storage_client()
+
+    @property
+    def location(self) -> str:
+        return "gs://{0}/{1}".format(self.bucket_name, self.path)
     
     def upload(self, artifacts: List[Type[Artifact]]):
         buffer_dict = self.serialize_artifacts(artifacts)
