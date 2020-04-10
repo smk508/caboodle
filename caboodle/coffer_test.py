@@ -20,18 +20,18 @@ def test_Coffer():
     coffee.upload(art_gallery)
     fart_gallery = coffee.download()
     art_gallery_dict = {
-        'fireworks': art1.content,
-        'pickle': art2.content,
-        'binary': art3.content
+        'fireworks': art1.data,
+        'pickle': art2.data,
+        'binary': art3.data
     }
     fart_gallery_dict = {}
     for artifact in fart_gallery:
         if artifact.key.endswith('fireworks'):
-            fart_gallery_dict['fireworks'] = artifact.content
+            fart_gallery_dict['fireworks'] = artifact.data
         if artifact.key.endswith('pickle'):
-            fart_gallery_dict['pickle'] = artifact.content
+            fart_gallery_dict['pickle'] = artifact.data
         if artifact.key.endswith('binary'):
-            fart_gallery_dict['binary'] = artifact.content                        
+            fart_gallery_dict['binary'] = artifact.data                        
 
     for art, fart in zip(art_gallery_dict.values(), fart_gallery_dict.values()):
         assert art == fart

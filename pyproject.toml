@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "the-whole-caboodle"
-version = "0.2.6"
+version = "0.2.7"
 description = "Utilities for artifact management for data science in the cloud."
 authors = ["Saad Khan <skhan8@mail.einstein.yu.edu>"]
 packages = [

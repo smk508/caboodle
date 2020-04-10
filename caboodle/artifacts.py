@@ -57,18 +57,65 @@ class Artifact(metaclass=abc.ABCMeta):
     content, which is the actual data to be stored. The key is used to refer to the artifact in the storage system.
     """
     artifact_type = object
-    def __init__(self, key:str, content:artifact_type, deserialize=False):
+    def __init__(self, key:str, content:artifact_type = None, deserialize=False, path_or_buffer=None):
         self.key = key
-        self.content = content
+        self._content = content
+        self.path_or_buffer = path_or_buffer
         if deserialize:
-            self.content = self.deserialize(content)
+            self._content = self.deserialize(self.path_or_buffer)
+
+    def load(self):
+        """
+        Deserializes data from path_or_buffer and returns content.
+        """
+        if self._content is not None:
+            return self._content
+        if self.path_or_buffer is not None:
+            self._content = self.deserialize(self.path_or_buffer)
+
+        return self._content
+
+    def save(self):
+        """
+        Serializes content and saves it to local path.
+        """
+        if self.path_or_buffer is None:
+            raise AttributeError("There is no path_or_buffer attribute set for saving to.")
+        self.serialize(self.path_or_buffer)
+
+    def close(self):
+        """
+        Re-serializes data to path_or_buffer
+        """
+        if self.path_or_buffer is not None:
+            self._content = None
+
+    def __enter__(self):
+        """
+        Context manager deserializes file on entry and reserializes on exit.
+        """
+        return self.load()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    @property
+    def data(self):
+        """
+        This will deserialize data from file if necessary.
+        """
+        if self._content:
+            return self._content
+
+        elif self.path_or_buffer is not None:
+            return self.load()
 
     @abc.abstractmethod
-    def serialize(self, path_or_buffer:PathOrBuffer):
+    def serialize(self, path_or_buffer: PathOrBuffer):
         pass
     
     @abc.abstractmethod
-    def deserialize(self, path:PathOrBuffer):
+    def deserialize(self, path_or_buffer: PathOrBuffer):
         """
         Loads the artifact from a given file path.
         """
@@ -87,7 +134,7 @@ if fireworks_installed:
 
         def serialize(self, path_or_buffer:PathOrBuffer):
             with get_buffer(path_or_buffer, direction = 'write') as f:
-                self.content.save(f)
+                self.data.save(f)
 
         def deserialize(self, path_or_buffer:PathOrBuffer):
             with get_buffer(path_or_buffer, direction = 'read') as f:
@@ -100,7 +147,7 @@ class PickleArtifact(Artifact):
     artifact_type = object
     def serialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'write') as f:
-            pickle.dump(self.content, f)
+            pickle.dump(self.data, f)
     
     def deserialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'read') as f:
@@ -115,7 +162,7 @@ class BinaryArtifact(Artifact):
     artifact_type = bytes
     def serialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'write') as f:
-            f.write(self.content)
+            f.write(self.data)
 
     def deserialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'read') as f:

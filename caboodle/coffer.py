@@ -69,15 +69,12 @@ class Coffer(metaclass=abc.ABCMeta):
         Serializes a list of artifacts and returns a dictionary mapping their keys to their
         binary representations.
         """
-        artifact_dict = {}
-            
+    
         for artifact in artifacts:
             buffer = io.BytesIO()
             artifact.serialize(buffer)
             buffer.seek(0)
-            artifact_dict[artifact.key] = buffer
-                
-        return artifact_dict            
+            yield artifact.key, buffer
 
     def save_artifacts(self, path:str, artifacts: List[Artifact]) -> str:
         """
@@ -115,7 +112,7 @@ class DebugCoffer(Coffer):
     def download(self) -> List[Type[Artifact]]:
         return self.artifacts
 
-class LocalCoffeR(Coffer):
+class LocalCoffer(Coffer):
     """
     Stores Artifacts on disk under a given folder.
     """
@@ -140,7 +137,8 @@ class LocalCoffeR(Coffer):
                 key = filename
                 artifact = artifact_type(key, os.path.join(self.folder, key), deserialize=True)
                 self.artifacts.append(artifact)
-
+            except:
+                pass
         return self.artifacts
 
 class GCSCoffer(Coffer):
@@ -159,13 +157,30 @@ class GCSCoffer(Coffer):
         return "gs://{0}/{1}".format(self.bucket_name, self.path)
     
     def upload(self, artifacts: List[Type[Artifact]]):
-        buffer_dict = self.serialize_artifacts(artifacts)
+
         bucket = self.storage_client.get_bucket(self.bucket_name)
-        for key, buffer in buffer_dict.items():
+        serialized_artifacts = self.serialize_artifacts(artifacts)
+        for key, buffer in serialized_artifacts:
             blob = bucket.blob(os.path.join(self.path, key))
             blob.upload_from_string(buffer.read())
 
-    def download(self) -> List[Type[Artifact]]:
+    def __iter__(self):
+
+        bucket = self.storage_client.get_bucket(self.bucket_name)
+        blobs = bucket.list_blobs(prefix=self.path)
+        def generator():
+            for blob in blobs:
+                try:
+                    artifact_type = infer_type(blob.name)
+                    buffer = io.BytesIO(blob.download_as_string())
+                    key = blob.name.split('/')[-1]
+                    artifact = artifact_type(key, buffer, deserialize=True)
+                    yield artifact
+                except KeyError:
+                    pass
+
+
+    def download(self, path = None) -> List[Artifact]:
         bucket = self.storage_client.get_bucket(self.bucket_name)
         blobs = bucket.list_blobs(prefix=self.path)
         artifacts = []
@@ -174,7 +189,10 @@ class GCSCoffer(Coffer):
                 artifact_type = infer_type(blob.name)
                 buffer = io.BytesIO(blob.download_as_string())
                 key = blob.name.split('/')[-1]
-                artifact = artifact_type(key, buffer, deserialize=True)
+                artifact = artifact_type(key, buffer, path_or_buffer=os.path.join(self.path, key), deserialize=True)
+                if path:
+                    artifact.save()
+                    artifact.close()
                 artifacts.append(artifact)
             except KeyError:
                 pass
@@ -201,10 +219,3 @@ class GCSCoffer(Coffer):
         artifact = artifact_type(key, buffer, deserialize=True)        
 
         return artifact
-
-def transfer_artifacts(sender: Coffer, receiver: Coffer):
-    """
-    Copies all artifacts from sender Coffer to receiver. Useful if you want to
-    transfer files from one location to another.
-    """
-    pass
