@@ -17,7 +17,8 @@ except ModuleNotFoundError:
 
 suffixes = { # File suffixes are used to automatically read in artifacts from file into the correct format.
     'bin': artifacts.BinaryArtifact,
-    'pickle': artifacts.PickleArtifact
+    'pickle': artifacts.PickleArtifact,
+    0: artifacts.BinaryArtifact, # Default for arbitrary files. 
 }
 
 if fireworks_installed:
@@ -28,14 +29,10 @@ def infer_type(name):
     Returns the artifact type to use for a given filename.
     """
     suffix = name.split('.')[-1]
-    try:
-        return suffixes[suffix]
-    except KeyError:
-        raise KeyError
-        ("Could not infer or parse file type for {1}. Must be one of: {0}".format(
-            ", ".join(".{0}".format(s, name) for s in suffixes.keys())
-            )
-        )
+    if suffix in suffixes:
+        return suffix
+    else:
+        return 0
 
 class Coffer(metaclass=abc.ABCMeta):
     """
@@ -63,6 +60,19 @@ class Coffer(metaclass=abc.ABCMeta):
         example, this could refer to a bucket URI
         """
         pass
+
+    @abc.abstractmethod
+    def upload_folder(self, path):
+        """
+        Uploads all files in a folder to the coffer storage.
+        """
+        artifacts = []
+        for filename in os.listdir(path):
+            artifact_type = infer_type(filename)
+            key = filename
+            artifact = artifact_type(key, os.path.join(self.folder, key), deserialize=False)
+            artifacts.append(artifact)
+        self.upload(artifacts)
 
     def serialize_artifacts(self, artifacts: List[Artifact]) -> Dict[str, bytes]:
         """
