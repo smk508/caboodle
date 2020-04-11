@@ -30,9 +30,9 @@ def infer_type(name):
     """
     suffix = name.split('.')[-1]
     if suffix in suffixes:
-        return suffix
+        return suffixes[suffix]
     else:
-        return 0
+        return suffixes[0]
 
 class Coffer(metaclass=abc.ABCMeta):
     """
@@ -62,6 +62,12 @@ class Coffer(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def delete(self):
+        """
+        Deletes all artifacts in this coffer.
+        """
+        pass
+
     def upload_folder(self, path):
         """
         Uploads all files in a folder to the coffer storage.
@@ -70,7 +76,7 @@ class Coffer(metaclass=abc.ABCMeta):
         for filename in os.listdir(path):
             artifact_type = infer_type(filename)
             key = filename
-            artifact = artifact_type(key, os.path.join(self.folder, key), deserialize=False)
+            artifact = artifact_type(key, path_or_buffer=os.path.join(path, key), deserialize=False)
             artifacts.append(artifact)
         self.upload(artifacts)
 
@@ -121,6 +127,9 @@ class DebugCoffer(Coffer):
 
     def download(self) -> List[Type[Artifact]]:
         return self.artifacts
+    
+    def delete(self):
+        self.artifacts = []
 
 class LocalCoffer(Coffer):
     """
@@ -190,7 +199,7 @@ class GCSCoffer(Coffer):
                     pass
 
 
-    def download(self, path = None) -> List[Artifact]:
+    def download(self, local_path = None) -> List[Artifact]:
         bucket = self.storage_client.get_bucket(self.bucket_name)
         blobs = bucket.list_blobs(prefix=self.path)
         artifacts = []
@@ -199,8 +208,8 @@ class GCSCoffer(Coffer):
                 artifact_type = infer_type(blob.name)
                 buffer = io.BytesIO(blob.download_as_string())
                 key = blob.name.split('/')[-1]
-                artifact = artifact_type(key, buffer, path_or_buffer=os.path.join(self.path, key), deserialize=True)
-                if path:
+                artifact = artifact_type(key, buffer, path_or_buffer=os.path.join(local_path, key), deserialize=True)
+                if local_path:
                     artifact.save()
                     artifact.close()
                 artifacts.append(artifact)
@@ -229,3 +238,12 @@ class GCSCoffer(Coffer):
         artifact = artifact_type(key, buffer, deserialize=True)        
 
         return artifact
+
+    def delete(self):
+        """
+        Deletes all artifacts in the Coffer.
+        """
+        bucket = self.storage_client.get_bucket(self.bucket_name)
+        blobs = bucket.list_blobs(prefix=self.path)
+        for blob in blobs:
+            blob.delete()

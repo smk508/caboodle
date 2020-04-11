@@ -61,12 +61,12 @@ class Artifact(metaclass=abc.ABCMeta):
         self.key = key
         self._content = content
         self.path_or_buffer = path_or_buffer
-        if deserialize:
+        if content is None and deserialize:
             self._content = self.deserialize(self.path_or_buffer)
 
     def load(self):
         """
-        Deserializes data from path_or_buffer and returns content.
+        De-serializes data from path_or_buffer and returns content.
         """
         if self._content is not None:
             return self._content

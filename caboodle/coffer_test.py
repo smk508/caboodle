@@ -10,8 +10,10 @@ def test_Coffer():
 
     m = Message({'a': [1,2,3], 'b': torch.tensor([4,5,6])})
     art1 = artifacts.FireworksArtifact('test.fireworks', m)
+
     p = [1,2,3,4,'hii']
     art2 = artifacts.PickleArtifact('test.pickle', p)
+
     b = b'hohohooh'
     art3 = artifacts.BinaryArtifact('test.bin', b)
 
