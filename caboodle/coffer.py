@@ -17,7 +17,8 @@ except ModuleNotFoundError:
 
 suffixes = { # File suffixes are used to automatically read in artifacts from file into the correct format.
     'bin': artifacts.BinaryArtifact,
-    'pickle': artifacts.PickleArtifact
+    'pickle': artifacts.PickleArtifact,
+    0: artifacts.BinaryArtifact, # Default for arbitrary files. 
 }
 
 if fireworks_installed:
@@ -28,14 +29,10 @@ def infer_type(name):
     Returns the artifact type to use for a given filename.
     """
     suffix = name.split('.')[-1]
-    try:
+    if suffix in suffixes:
         return suffixes[suffix]
-    except KeyError:
-        raise KeyError
-        ("Could not infer or parse file type for {1}. Must be one of: {0}".format(
-            ", ".join(".{0}".format(s, name) for s in suffixes.keys())
-            )
-        )
+    else:
+        return suffixes[0]
 
 class Coffer(metaclass=abc.ABCMeta):
     """
@@ -63,6 +60,25 @@ class Coffer(metaclass=abc.ABCMeta):
         example, this could refer to a bucket URI
         """
         pass
+
+    @abc.abstractmethod
+    def delete(self):
+        """
+        Deletes all artifacts in this coffer.
+        """
+        pass
+
+    def upload_folder(self, path):
+        """
+        Uploads all files in a folder to the coffer storage.
+        """
+        artifacts = []
+        for filename in os.listdir(path):
+            artifact_type = infer_type(filename)
+            key = filename
+            artifact = artifact_type(key, path_or_buffer=os.path.join(path, key), deserialize=False)
+            artifacts.append(artifact)
+        self.upload(artifacts)
 
     def serialize_artifacts(self, artifacts: List[Artifact]) -> Dict[str, bytes]:
         """
@@ -111,6 +127,9 @@ class DebugCoffer(Coffer):
 
     def download(self) -> List[Type[Artifact]]:
         return self.artifacts
+    
+    def delete(self):
+        self.artifacts = []
 
 class LocalCoffer(Coffer):
     """
@@ -180,7 +199,7 @@ class GCSCoffer(Coffer):
                     pass
 
 
-    def download(self, path = None) -> List[Artifact]:
+    def download(self, local_path = None) -> List[Artifact]:
         bucket = self.storage_client.get_bucket(self.bucket_name)
         blobs = bucket.list_blobs(prefix=self.path)
         artifacts = []
@@ -189,8 +208,8 @@ class GCSCoffer(Coffer):
                 artifact_type = infer_type(blob.name)
                 buffer = io.BytesIO(blob.download_as_string())
                 key = blob.name.split('/')[-1]
-                artifact = artifact_type(key, buffer, path_or_buffer=os.path.join(self.path, key), deserialize=True)
-                if path:
+                artifact = artifact_type(key, buffer, path_or_buffer=os.path.join(local_path, key), deserialize=True)
+                if local_path:
                     artifact.save()
                     artifact.close()
                 artifacts.append(artifact)
@@ -219,3 +238,12 @@ class GCSCoffer(Coffer):
         artifact = artifact_type(key, buffer, deserialize=True)        
 
         return artifact
+
+    def delete(self):
+        """
+        Deletes all artifacts in the Coffer.
+        """
+        bucket = self.storage_client.get_bucket(self.bucket_name)
+        blobs = bucket.list_blobs(prefix=self.path)
+        for blob in blobs:
+            blob.delete()

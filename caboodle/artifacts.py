@@ -61,12 +61,12 @@ class Artifact(metaclass=abc.ABCMeta):
         self.key = key
         self._content = content
         self.path_or_buffer = path_or_buffer
-        if deserialize:
+        if content is None and deserialize:
             self._content = self.deserialize(self.path_or_buffer)
 
     def load(self):
         """
-        Deserializes data from path_or_buffer and returns content.
+        De-serializes data from path_or_buffer and returns content.
         """
         if self._content is not None:
             return self._content
@@ -161,8 +161,11 @@ class BinaryArtifact(Artifact):
     """
     artifact_type = bytes
     def serialize(self, path_or_buffer:PathOrBuffer):
+        data = self.data
+        if type(data) is io.BytesIO:
+            data = data.read()
         with get_buffer(path_or_buffer, direction = 'write') as f:
-            f.write(self.data)
+            f.write(data)
 
     def deserialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'read') as f:
