@@ -1,10 +1,20 @@
 # Imports the Google Cloud client library
 from google.cloud import storage
+from google.resumable_media import DataCorruption
+from gcloud.aio.storage import Storage
 from typing import List, Tuple, Union
 import io
 import warnings
 import os
 from tqdm import tqdm
+import asyncio
+import aiohttp
+import aiofiles
+import time
+import uvloop
+from itertools import count
+
+uvloop.install()
 
 def printv(*args, verbose=True, **kwargs):
     if verbose:
@@ -129,26 +139,116 @@ def download_file_to_path(
     with open(path, 'wb') as f:
         storage_client.download_blob_to_file(blob, f)
 
-def download_folder_to_path(
-    bucket_name: str, 
-    folder: str, 
-    path: str, 
-    suffix: str=None,
-    storage_client = None):
-    """ Downloads a folder hosted in a bucket to the chosen path. """
+def _make_parent_dirs(filename: str):
+    """ Attempts to create directories for any parent directories in filename. """
+    components = os.path.split(filename)[0].split("/")
+    for i in range(len(components)):
+        subpath = "/".join(components[0:i+1])
+        if subpath != '':
+            if not os.path.isdir(subpath):
+                try:
+                    print(subpath)
+                    os.mkdir(subpath)
+                except IOError:
+                    raise IOError("Could not create subdirectory {0} when downloading file {1}. Make sure you have the right permissions.".format(subpath, filename))
+                    
     
+def download_folder_to_path(
+    bucket_name: str,
+    folder: str,
+    path: str,
+    suffix: str=None,
+    storage_client = None,
+    flatten=False,
+    asynchronous=True,
+    ):
+    """ 
+    Downloads a folder hosted in a bucket to the chosen path.
+    If flatten is set to True, then the hierarchy structure of the cloud folder
+    is ignored and all files are downloaded to a single directory.
+    """
+
     storage_client = storage_client or get_storage_client()
     bucket = storage_client.get_bucket(bucket_name)
     blobs = list(bucket.list_blobs(prefix=folder))
     if suffix:
         blobs = [b for b in blobs if b.name.endswith(suffix)]
+    #if not os.path.isdir(path):
+    #    raise ValueError("You must first create a folder at {0} before running
+    #    this command.".format(path))
+    if folder.startswith("/"):
+        sublength = len(folder.split("/")) - 1
+    else:
+        sublength = len(folder.split("/"))
+    if asynchronous:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(_download_blobs_async(blobs, flatten, sublength, path))
+    else:
+        _download_blobs(blobs, flatten, sublength, path, storage_client)
+
+def _download_blobs(blobs, flatten, sublength, path, storage_client=None):
+
+    storage_client = storage_client or get_storage_client()
     for blob in tqdm(blobs):
-        filename = blob.name.split('/')[-1]
-        if not os.path.isdir(path):
-            raise ValueError("You must first create a folder at {0} before running this command.".format(path))
-        with open(os.path.join(path, filename), 'wb') as f:
-            print("Downloading {0}".format(blob.name))
-            storage_client.download_blob_to_file(blob, f)
+        if flatten:
+            filename = blob.name.split('/')[-1]
+        else:
+            filename = os.path.join(*blob.name.split('/')[sublength:])
+            # Create a folder for the parts of subpath that extend beyond the folder.
+            components = blob.name.split('/')
+
+        full_filename = os.path.join(path, filename)
+        _make_parent_dirs(full_filename)
+        with open(os.path.join(full_filename), 'wb') as f:
+            print("Downloading {0} to {1}".format(blob.name, full_filename))
+            try:
+                storage_client.download_blob_to_file(blob, f)         
+            except DataCorruption: # Sometimes there is an error with the MD5 hash, so retry.
+                storage_client.download_blob_to_file(blob, f)
+
+
+async def async_list(list):
+
+    for l in list:
+        yield l
+
+async def _download_blobs_async(blobs, flatten, sublength, path, max_concurrency=8):
+
+    #max_queue = min(max_queue, len(blobs))
+    max_queue = len(blobs)
+    max_concurrency = min(max_concurrency, max_queue)
+    semaphore = asyncio.Semaphore(max_concurrency)
+    tasks = []
+    async with aiohttp.ClientSession() as session:
+        storage_client = Storage(session=session)
+        for blob in blobs:
+            tasks.append(_download_blob_async(blob, semaphore, flatten, sublength, path, storage_client))
+        for task in tqdm(tasks):
+            await task
+            
+async def _download_blob_async(blob, semaphore, flatten, sublength, path, storage_client):
+
+        await semaphore.acquire()
+        if flatten:
+            filename = blob.name.split('/')[-1]
+        else:
+            filename = os.path.join(*blob.name.split('/')[sublength:])
+            # Create a folder for the parts of subpath that extend beyond the folder.
+            components = blob.name.split('/')
+
+        full_filename = os.path.join(path, filename)
+        _make_parent_dirs(full_filename)
+        print("Downloading {0} to {1}".format(blob.name, full_filename))
+        try:
+            response = await storage_client.download(blob.bucket.name, blob.name, timeout=20000000)
+        except:
+            response = await storage_client.download(blob.bucket.name, blob.name, timeout=20000000)
+        async with aiofiles.open(os.path.join(full_filename), "wb") as af:
+            await af.write(response)    
+            print("Downloaded {0} to {1}".format(blob.name, full_filename))
+        semaphore.release()
+
+        return True
 
 def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
     """ Parses a gcs path string of the form gs://{bucket-name}/{path} into bucket and path components. """
@@ -166,7 +266,7 @@ def parse_gcs_path(gcs_path:str) -> Tuple[str,str]:
     return bucket_name, path
 
 def check_for_files(
-    gcs_path: str, 
+    gcs_path: str,
     artifact_names: list,
     storage_client = None):
     """ Checks to see if the specified file names are present in the gcs directory. """

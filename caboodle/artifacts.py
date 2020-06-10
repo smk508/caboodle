@@ -161,8 +161,11 @@ class BinaryArtifact(Artifact):
     """
     artifact_type = bytes
     def serialize(self, path_or_buffer:PathOrBuffer):
+        data = self.data
+        if type(data) is io.BytesIO:
+            data = data.read()
         with get_buffer(path_or_buffer, direction = 'write') as f:
-            f.write(self.data)
+            f.write(data)
 
     def deserialize(self, path_or_buffer:PathOrBuffer):
         with get_buffer(path_or_buffer, direction = 'read') as f:
