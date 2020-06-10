@@ -12,6 +12,7 @@ import aiohttp
 import aiofiles
 import time
 import uvloop
+import itertools
 from itertools import count
 
 uvloop.install()
@@ -160,7 +161,7 @@ def download_folder_to_path(
     suffix: str=None,
     storage_client = None,
     flatten=False,
-    asynchronous=True,
+    asynchronous=False,
     ):
     """ 
     Downloads a folder hosted in a bucket to the chosen path.
@@ -207,24 +208,33 @@ def _download_blobs(blobs, flatten, sublength, path, storage_client=None):
                 storage_client.download_blob_to_file(blob, f)
 
 
-async def async_list(list):
+def grouper_it(n, iterable):
+    it = iter(iterable)
+    while True:
+        chunk_it = itertools.islice(it, n)
+        try:
+            first_el = next(chunk_it)
+        except StopIteration:
+            return
+        yield itertools.chain((first_el,), chunk_it)
 
-    for l in list:
-        yield l
-
-async def _download_blobs_async(blobs, flatten, sublength, path, max_concurrency=8):
+async def _download_blobs_async(blobs, flatten, sublength, path, max_concurrency=10, chunk_size=20):
 
     #max_queue = min(max_queue, len(blobs))
     max_queue = len(blobs)
     max_concurrency = min(max_concurrency, max_queue)
     semaphore = asyncio.Semaphore(max_concurrency)
-    tasks = []
     async with aiohttp.ClientSession() as session:
         storage_client = Storage(session=session)
-        for blob in blobs:
-            tasks.append(_download_blob_async(blob, semaphore, flatten, sublength, path, storage_client))
-        for task in tqdm(tasks):
-            await task
+        progress = tqdm(total=len(blobs))
+        num_chunks = int(len(blobs) / chunk_size) + 1
+        for group in grouper_it(num_chunks, blobs):
+            tasks = []
+            for blob in group:
+                tasks.append(_download_blob_async(blob, semaphore, flatten, sublength, path, storage_client))
+            for task in tqdm(tasks):
+                await task
+                progress.update(1)
             
 async def _download_blob_async(blob, semaphore, flatten, sublength, path, storage_client):
 
